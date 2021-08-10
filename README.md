@@ -16,12 +16,12 @@ Multiple transports can be run at the same time.
 Different data backends / storages can be set :
 
 - [X] Memory (temporary storage, for development/testing purpose)
-- [X] [PostgreSQL](https://www.postgresql.org/) database (might also work with [CockroachDB](https://github.com/cockroachdb/cockroach) but not tested yet as we use the [pgx](https://github.com/jackc/pgx) driver compatible with both PostgreSQL and CockroachDB). PostgreSQL backend relies heavily on database tables/schemas generated on the fly (each table stores data from one form, even for `unstructured` forms), so that we can easily plug another tool to visualize data like [NocoDB](https://www.nocodb.com/).
-- [ ] [Kantree](https://kantree.io) (one way)
+- [X] [PostgreSQL](https://www.postgresql.org/) database (might also work with [CockroachDB](https://github.com/cockroachdb/cockroach) but not tested yet as we use the [pgx](https://github.com/jackc/pgx) driver compatible with both PostgreSQL and CockroachDB). PostgreSQL backend relies heavily on database tables/schemas generated on the fly (each table stores data from one form, even for `unstructured` forms, without defined schemas), so that we can easily plug another tool to visualize data like [Apache Superset](https://github.com/apache/superset), [Metabase](https://github.com/metabase/metabase) or [NocoDB](https://www.nocodb.com/).
+- [X] [Kantree](https://kantree.io) (one way) (TODO : add some documentation about this)
 - [ ] Email with SMTP (one way)
 - [ ] Webhooks (one way)
 
-"One way" backends do not store the form states.
+"One way" backends do not store the form states. They could be better considered as "connectors" to other services, but are designed as the other backends in the code (they implement the same interface `Backend`).
 
 At least one storage has to be set at the service level globally. These global storages cannot be "one way". Supported "global" storages are at the moment : Memory (temporary storage : only for development) and PostgreSQL
 

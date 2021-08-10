@@ -14,14 +14,17 @@ import (
 
 // PgsqlBackend is a backend using PostgreSQL
 type PgsqlBackend struct {
-	Forms     map[string]Form
-	Responses map[string][]Response
-
 	Conn *pgxpool.Pool
 }
 
 func (b PgsqlBackend) Type() string {
 	return "Pgsql"
+}
+
+func (b PgsqlBackend) Configuration() map[string]interface{} {
+	return map[string]interface{}{
+		"type": b.Type(),
+	}
 }
 
 // NewPgsqlBackend initializes a new empty PgsqlBackend
@@ -32,7 +35,7 @@ func NewPgsqlBackend(databaseurl string) PgsqlBackend {
 		panic(err)
 	}
 
-	if _, err := conn.Exec(context.Background(), "create table if not exists __config(id varchar(50) primary key, type varchar(20), schema json)"); err != nil {
+	if _, err := conn.Exec(context.Background(), "create table if not exists __config(id varchar(50) primary key, type varchar(20), schema json, additional_backends json)"); err != nil {
 		panic(err)
 	}
 
@@ -84,7 +87,7 @@ func (b PgsqlBackend) DeleteForm(formId string) error {
 	if _, err := tx.Exec(context.Background(), "delete from __config where id=$1", formId); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(context.Background(), "drop table form_"+formId); err != nil {
+	if _, err := tx.Exec(context.Background(), fmt.Sprintf("drop table %s", pgx.Identifier{"form_" + formId}.Sanitize())); err != nil {
 		return err
 	}
 	if err := tx.Commit(context.Background()); err != nil {
@@ -173,22 +176,64 @@ func (b PgsqlBackend) SubmitResponse(form Form, response Response) error {
 			return err
 		}
 		for _, k := range keys {
+			kind := reflect.TypeOf(responsemap[k]).Kind()
 			switch {
-			case reflect.TypeOf(responsemap[k]).Kind() == reflect.String:
-				if _, err := tx.Exec(context.Background(), fmt.Sprintf("alter table %s add column if not exists %s varchar(250)", "form_"+form.ID(), k)); err != nil {
-					fmt.Println("dfsd")
+			case kind == reflect.String:
+				if _, err := tx.Exec(
+					context.Background(),
+					fmt.Sprintf("alter table %s add column if not exists %s varchar(250)",
+						pgx.Identifier{"form_" + form.ID()}.Sanitize(),
+						pgx.Identifier{k}.Sanitize(),
+					),
+				); err != nil {
 					return err
 				}
 				break
-			case reflect.TypeOf(responsemap[k]).Kind() == reflect.Bool:
-				if _, err := tx.Exec(context.Background(), fmt.Sprintf("alter table %s add column if not exists %s boolean", "form_"+form.ID(), k)); err != nil {
-					fmt.Println("aaa")
+			case kind == reflect.Bool:
+				if _, err := tx.Exec(
+					context.Background(),
+					fmt.Sprintf(
+						"alter table %s add column if not exists %s boolean",
+						pgx.Identifier{"form_" + form.ID()}.Sanitize(),
+						pgx.Identifier{k}.Sanitize(),
+					),
+				); err != nil {
 					return err
 				}
 				break
-			case reflect.TypeOf(responsemap[k]).Kind() == reflect.Map:
-				if _, err := tx.Exec(context.Background(), fmt.Sprintf("alter table %s add column if not exists %s json", "form_"+form.ID(), k)); err != nil {
-					fmt.Println("vvv")
+			case kind == reflect.Map:
+				if _, err := tx.Exec(
+					context.Background(),
+					fmt.Sprintf(
+						"alter table %s add column if not exists %s json",
+						pgx.Identifier{"form_" + form.ID()}.Sanitize(),
+						pgx.Identifier{k}.Sanitize(),
+					),
+				); err != nil {
+					return err
+				}
+				break
+			case kind == reflect.Int || kind == reflect.Uint || kind == reflect.Uint32 || kind == reflect.Uint64 || kind == reflect.Int32 || kind == reflect.Int64:
+				if _, err := tx.Exec(
+					context.Background(),
+					fmt.Sprintf(
+						"alter table %s add column if not exists %s integer",
+						pgx.Identifier{"form_" + form.ID()}.Sanitize(),
+						pgx.Identifier{k}.Sanitize(),
+					),
+				); err != nil {
+					return err
+				}
+				break
+			case kind == reflect.Float32 || kind == reflect.Float64:
+				if _, err := tx.Exec(
+					context.Background(),
+					fmt.Sprintf(
+						"alter table %s add column if not exists %s numeric",
+						pgx.Identifier{"form_" + form.ID()}.Sanitize(),
+						pgx.Identifier{k}.Sanitize(),
+					),
+				); err != nil {
 					return err
 				}
 				break
@@ -218,7 +263,7 @@ func (b PgsqlBackend) SubmitResponse(form Form, response Response) error {
 // GetFormResponses retrieves the responses for a given form (with formId)
 func (b PgsqlBackend) GetFormResponses(formId string) ([]Response, error) {
 	responses := []Response{}
-	rows, err := b.Conn.Query(context.Background(), fmt.Sprintf("select * from form_%s", formId))
+	rows, err := b.Conn.Query(context.Background(), fmt.Sprintf("select * from %s", pgx.Identifier{"form_" + formId}.Sanitize()))
 	if err != nil {
 		fmt.Println("err 1")
 		return nil, err
@@ -245,6 +290,58 @@ func (b PgsqlBackend) GetFormResponses(formId string) ([]Response, error) {
 	return responses, nil
 }
 
+// AddFormBackend adds an additional backend to a given form
+func (b PgsqlBackend) AddFormBackend(id string, backend Backend) error {
+	// var formid string
+	// var formtype string
+	// var formschema []byte
+	var formbackends []byte
+	if err := b.Conn.QueryRow(context.Background(), "select additional_backends from __config where id=$1", id).Scan(&formbackends); err != nil {
+		fmt.Println("1 : ", err)
+		return err
+	}
+
+	backends := []map[string]interface{}{}
+
+	if formbackends != nil {
+		if err := json.Unmarshal(formbackends, &backends); err != nil {
+			fmt.Println("2 : ", err)
+			return err
+		}
+	}
+
+	backends = append(backends, backend.Configuration())
+
+	if _, err := b.Conn.Exec(context.Background(), "update __config set additional_backends = $1 where id=$2", backends, id); err != nil {
+		fmt.Println("3 : ", err)
+		return err
+	}
+	return nil
+}
+
+func (b PgsqlBackend) GetFormBackends(id string) ([]Backend, error) {
+	var formbackends []byte
+	if err := b.Conn.QueryRow(context.Background(), "select additional_backends from __config where id=$1", id).Scan(&formbackends); err != nil {
+		return nil, err
+	}
+
+	backends := []Backend{}
+
+	var backendconfigs []map[string]interface{}
+
+	if err := json.Unmarshal(formbackends, &backendconfigs); err != nil {
+		return nil, err
+	}
+
+	for _, bc := range backendconfigs {
+		if reflect.ValueOf(bc["type"]).Kind() == reflect.String && bc["type"].(string) == "Kantree" {
+			backends = append(backends, NewKantreeBackend(bc["configuration"].(map[string]interface{})))
+		}
+	}
+
+	return backends, nil
+}
+
 // schemaToSQL is a small function to generate table columns name and types from a JTD schema (used during table creation)
 // Returns "" (empty string) in case of a nil schema
 func schemaToSQL(s *jtd.Schema) string {
@@ -260,16 +357,16 @@ func schemaToSQL(s *jtd.Schema) string {
 		first = false
 		switch {
 		case v.Type == "string":
-			create += fmt.Sprintf("%s varchar(250)", k)
+			create += fmt.Sprintf("%s varchar(250)", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "boolean":
-			create += fmt.Sprintf("%s boolean", k)
+			create += fmt.Sprintf("%s boolean", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "float64" || v.Type == "float32":
-			create += fmt.Sprintf("%s numeric", k)
+			create += fmt.Sprintf("%s numeric", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "int8" || v.Type == "uint8" || v.Type == "int16" || v.Type == "uint16" || v.Type == "int32" || v.Type == "uint32":
-			create += fmt.Sprintf("%s integer", k)
+			create += fmt.Sprintf("%s integer", pgx.Identifier{k}.Sanitize())
 			break
 		}
 	}

@@ -2,6 +2,7 @@ package forms
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -106,6 +107,19 @@ func (s *Service) SubmitResponse(formId string, response Response) error {
 			return err
 		}
 	}
+
+	additionalBackends, err := s.GetFormBackends(formId)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
+	// Form backends
+	for _, b := range additionalBackends {
+		if err := b.SubmitResponse(form, response); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -122,4 +136,32 @@ func (s *Service) GetFormResponses(formId string) ([]Response, error) {
 	}
 
 	return responses, nil
+}
+
+// AddFormBackend adds a backend to a form
+func (s *Service) AddFormBackend(formid string, b Backend) error {
+	if len(s.Backends) == 0 {
+		return errors.New("not enough backends")
+	}
+
+	if err := s.Backends[0].AddFormBackend(formid, b); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddFormBackend adds a backend to a form
+func (s *Service) GetFormBackends(formid string) ([]Backend, error) {
+	if len(s.Backends) == 0 {
+		return nil, errors.New("not enough backends")
+	}
+
+	backends, err := s.Backends[0].GetFormBackends(formid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return backends, nil
 }

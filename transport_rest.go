@@ -94,6 +94,18 @@ func (t RESTTransport) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			http.NotFound(rw, req)
 			return
 		}
+	case match(p, "/forms/([^/]+)/backends", &formId):
+		switch {
+		case m == "GET":
+			t.getFormBackends(formId, rw, req)
+			return
+		case m == "POST":
+			t.postFormBackend(formId, rw, req)
+			return
+		default:
+			http.NotFound(rw, req)
+			return
+		}
 	default:
 		http.NotFound(rw, req)
 		return
@@ -225,6 +237,44 @@ func (t RESTTransport) getFormResponses(formId string, rw http.ResponseWriter, r
 	respond(rw, responses, http.StatusOK)
 }
 
+// postFormBackend creates a new backend for the form with the given ID
+func (t RESTTransport) postFormBackend(formId string, rw http.ResponseWriter, req *http.Request) {
+	var backend RESTBackendDefinition
+
+	decoder := json.NewDecoder(req.Body)
+	// decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&backend); err != nil {
+		fmt.Println("error 1")
+		respond(rw, errJson(err), http.StatusBadRequest)
+		return
+	}
+	if err := t.Service.AddFormBackend(formId, backend.Backend()); err != nil {
+		respond(rw, errJson(err), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println(backend)
+	respond(rw, backend, http.StatusOK)
+}
+
+// getFormResponses retrieve form responses for the given form id
+func (t RESTTransport) getFormBackends(formId string, rw http.ResponseWriter, req *http.Request) {
+	responses, err := t.Service.GetFormBackends(formId)
+	if err != nil {
+		respond(rw, errJson(err), http.StatusBadRequest)
+		return
+	}
+
+	backends := []RESTBackendDefinition{}
+	for _, b := range responses {
+		backends = append(backends, RESTBackendDefinition{
+			StorageType: b.Type(),
+		})
+	}
+
+	respond(rw, backends, http.StatusOK)
+}
+
 // RESTFormDefintion is the form form definition
 //
 // The type of the form is "Unstructured" if there is no specific schema, or structured. Default value (if unknown or any other value) is "Unstructured".
@@ -257,8 +307,8 @@ func RESTForm(f Form) RESTFormDefinition {
 //
 // Configuration keys depend on the storage type
 type RESTBackendDefinition struct {
-	StorageType   string
-	Configuration map[string]string
+	StorageType   string                 `json:"storage_type"`
+	Configuration map[string]interface{} `json:"configuration, omitempty"`
 }
 
 // RESTBackend transforms a Backend to the RESTBackendDefinition type for correct JSON marshalling
@@ -266,6 +316,18 @@ func RESTBackend(b Backend) RESTBackendDefinition {
 	return RESTBackendDefinition{
 		StorageType: b.Type(),
 	}
+}
+
+func (b RESTBackendDefinition) Backend() Backend {
+	switch {
+	case b.StorageType == "Kantree":
+		return NewKantreeBackend(b.Configuration)
+	case b.StorageType == "Pgsql":
+		return NewPgsqlBackend(b.Configuration["database_url"].(string))
+	}
+
+	// Backend type not found : fallback to TempBackend
+	return NewTempBackend()
 }
 
 // match reports whether path matches regex ^pattern$, and if it matches,
@@ -332,6 +394,9 @@ func mustCompileCached(pattern string) *regexp.Regexp {
 }
 
 //errJson transform an error to a JSON response
-func errJson(err error) string {
-	return fmt.Sprintf(`{error: "%s"}`, err)
+func errJson(err error) map[string]string {
+	//return fmt.Sprintf(`{error: "%s"}`, err)
+	return map[string]string{
+		"error": err.Error(),
+	}
 }

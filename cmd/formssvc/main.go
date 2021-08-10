@@ -15,13 +15,14 @@ func main() {
 	flag.Parse()
 	if *ui {
 		go func() {
-			fs := http.FileServer(http.Dir("./svelte/public/"))
-			http.Handle("/", http.StripPrefix("/svelte/public", fs))
+			fs := http.FileServer(http.Dir("./admin/public/"))
+			http.Handle("/", http.StripPrefix("/admin/public", fs))
 			fmt.Println("UI listing on port 8082")
 			fmt.Println(http.ListenAndServe(":8082", fs))
 		}()
 	}
 
+	fmt.Println("API listening on port 8080")
 	rest := forms.NewRESTTransport(":8080")
 
 	if *temp {

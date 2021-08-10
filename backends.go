@@ -8,12 +8,15 @@ import (
 // Backend is the interface for backends (storage, data handling)
 type Backend interface {
 	Type() string
+	Configuration() map[string]interface{}
 	AddForm(Form) error
 	DeleteForm(string) error
 	GetForms() ([]Form, error)
 	GetForm(string) (Form, error)
 	SubmitResponse(Form, Response) error
 	GetFormResponses(string) ([]Response, error)
+	AddFormBackend(string, Backend) error
+	GetFormBackends(string) ([]Backend, error)
 }
 
 // NoBackend is a fake backend implementation
@@ -28,6 +31,12 @@ type TempBackend struct {
 
 func (b TempBackend) Type() string {
 	return "Temp"
+}
+
+func (b TempBackend) Configuration() map[string]interface{} {
+	return map[string]interface{}{
+		"type": b.Type(),
+	}
 }
 
 // NewTempBackend initializes a new empty TempBackend
@@ -100,4 +109,27 @@ func (b TempBackend) GetFormResponses(formId string) ([]Response, error) {
 	}
 
 	return b.Responses[formId], nil
+}
+
+// AddFormBackend adds a backend to a form
+func (b TempBackend) AddFormBackend(formid string, backend Backend) error {
+
+	if b.Forms[formid] == nil {
+		return errors.New("form not found")
+	}
+
+	if err := b.Forms[formid].AddBackend(backend); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetFormBackends returns all the backends for one form
+func (b TempBackend) GetFormBackends(formid string) ([]Backend, error) {
+
+	if b.Forms[formid] == nil {
+		return nil, errors.New("form not found")
+	}
+
+	return b.Forms[formid].GetAdditionalBackends(), nil
 }
