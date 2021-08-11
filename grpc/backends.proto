@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+option go_package= "./grpc";
+
+message GRPCBackend {
+    string type = 1;
+    map<string, string> configuration = 2;
+}

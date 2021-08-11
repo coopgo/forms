@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+option go_package= "./grpc";
+
+import "forms.proto";
+import "backends.proto";
+
+service FormsService {
+    rpc AddForm(AddFormRequest) returns (AddFormResponse) {}
+    rpc DeleteForm(DeleteFormRequest) returns (DeleteFormResponse) {}
+    rpc GetForms(GetFormsRequest) returns (GetFormsResponse) {}
+    rpc GetForm(GetFormRequest) returns (GetFormResponse) {}
+    rpc SubmitResponse(SubmitResponseRequest) returns (SubmitResponseResponse) {}
+    rpc GetFormResponses(GetFormResponsesRequest) returns (GetFormResponsesResponse) {}
+    rpc AddFormBackend(AddFormBackendRequest) returns (AddFormBackendResponse) {}
+    rpc GetFormBackends(GetFormBackendsRequest) returns (GetFormBackendsResponse) {}
+}
+
+message AddFormRequest {
+    GRPCForm form = 1;
+}
+
+message AddFormResponse {
+    GRPCForm form = 1;
+}
+
+message DeleteFormRequest {
+    string formid = 1;
+}
+
+message DeleteFormResponse {}
+
+message GetFormsRequest {}
+
+message GetFormsResponse {
+    repeated GRPCForm forms = 1;
+}
+
+message GetFormRequest {
+    string formid = 1;
+}
+
+message GetFormResponse {
+    GRPCForm form = 1;
+}
+
+message SubmitResponseRequest {
+    string formid = 1;
+    string response = 2;
+}
+
+message SubmitResponseResponse {}
+
+message GetFormResponsesRequest {
+    string formid = 1;
+}
+
+message GetFormResponsesResponse {
+    repeated string responses = 1;
+}
+
+message AddFormBackendRequest {
+    string formid = 1;
+    GRPCBackend backend = 2;
+}
+
+message AddFormBackendResponse {}
+
+message GetFormBackendsRequest {
+    string formid = 1;
+}
+
+message GetFormBackendsResponse{
+    repeated GRPCBackend backends = 1;
+}

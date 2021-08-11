@@ -67,7 +67,6 @@ func (b KantreeBackend) GetForm(id string) (Form, error) {
 
 // Submitresponse registers a response to the form given it's formid
 func (b KantreeBackend) SubmitResponse(form Form, response Response) error {
-	//TODO submit response
 	req, err := http.NewRequest("GET", fmt.Sprintf("%sprojects/%s", b.BaseUrl, b.ProjectId), nil)
 
 	if err != nil {
@@ -88,8 +87,6 @@ func (b KantreeBackend) SubmitResponse(form Form, response Response) error {
 
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		fmt.Println("error 1")
-		fmt.Println(err)
 		return err
 	}
 
@@ -99,35 +96,36 @@ func (b KantreeBackend) SubmitResponse(form Form, response Response) error {
 
 	toplevelcardid := data["top_level_card_id"].(float64)
 
+	// responseBytes, _ := json.MarshalIndent(response, "", "  ")
+
+	// kantreecard := map[string]interface{}{
+	// 	"title": response.(map[string]interface{})[b.TitleField],
+	// 	"attributes": map[string]interface{}{
+	// 		"Description": string(responseBytes),
+	// 	},
+	// }
+
 	kantreecard := map[string]interface{}{
 		"title":      response.(map[string]interface{})[b.TitleField],
 		"attributes": response,
 	}
-
-	fmt.Println(kantreecard)
 
 	kcdata, err := json.Marshal(kantreecard)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(kcdata))
-
-	fmt.Println(fmt.Sprintf("%scards/%.0f/children", b.BaseUrl, toplevelcardid))
 	req2, err := http.NewRequest("POST", fmt.Sprintf("%scards/%.0f/children", b.BaseUrl, toplevelcardid), bytes.NewBuffer(kcdata))
 
 	if err != nil {
-		fmt.Println("error 3")
-		fmt.Println(err)
 		return err
 	}
 
 	req2.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(b.APIKey+":")))
+	req2.Header.Set("Content-Type", "application/json")
 
 	resp2, err := client.Do(req2)
 	if err != nil {
-		fmt.Println("error 4")
-		fmt.Println(err)
 		return err
 	}
 	defer resp2.Body.Close()
@@ -136,14 +134,8 @@ func (b KantreeBackend) SubmitResponse(form Form, response Response) error {
 
 	err = json.NewDecoder(resp2.Body).Decode(&newdata)
 	if err != nil {
-		fmt.Println("error 1")
-		fmt.Println(err)
 		return err
 	}
-
-	fmt.Println(newdata)
-	fmt.Println(resp2.Status)
-	fmt.Println(err)
 
 	return nil
 }

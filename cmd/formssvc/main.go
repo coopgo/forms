@@ -22,6 +22,9 @@ func main() {
 		}()
 	}
 
+	fmt.Println("gRPC listening on port 8083")
+	grpc := forms.NewGRPCTransport(":8083")
+
 	fmt.Println("API listening on port 8080")
 	rest := forms.NewRESTTransport(":8080")
 
@@ -40,7 +43,7 @@ func main() {
 	} else {
 		// Real database with PostgreSQL
 		s := forms.NewService(
-			[]forms.Transport{rest},
+			[]forms.Transport{rest, grpc},
 			[]forms.Backend{forms.NewPgsqlBackend("postgres://postgres:123456@localhost:5432/formssvc")},
 		)
 

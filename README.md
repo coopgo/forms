@@ -9,7 +9,7 @@
 Communication protocols (transports) :
 
 - [X] HTTP API (REST) 
-- [ ] gRPC
+- [X] gRPC
 
 Multiple transports can be run at the same time.
 
@@ -38,9 +38,21 @@ We have different types of forms :
 
 This project is still in development. It should be kind of functional using the PostgreSQL backend for simple use cases. Efforts still need to be made to support more complex forms with PostgreSQL and to implement other backends.
 
+## gRPC implementation and development considerations
+
+This project uses `protoc` and `protoc-gen-go-grpc` to handle gRPC transport. You need to install and run them to build the project of changing anything on the gRPC side.
+
+See [https://grpc.io/docs/languages/go/quickstart/](https://grpc.io/docs/languages/go/quickstart/) for more details on how it works.
+
+If you already know basics on this and have everything installed correctly, here is the command line to generate GRPC/Protocol buffers code inside the `grpc` package :
+
+$ protoc -I grpc/ grpc/*.proto --go-grpc_out=./ --go_out=./
+
+
 ## Contributing
 
 We welcome any contributions following theses guidelines :
+- **Any change to the code of the library must not break any transport or backend.** Any new feature should be implemented for all if applicable.
 - Write simple, clear and maintainable code and avoid technical debt. 
 - Leave the code cleaner than when you started.
 - Refactoring existing code for better performance, better readability or better testing wins over creating a new feature.
