@@ -11,7 +11,7 @@ curl -d '{ "type": "Structured", "schema": { "value1": { "type": "Text" }, "valu
 This is intended to be a minmalistic web service example.
 
 We implement a very basic example UI targetting the REST API using [Svelte](https://svelte.dev/) framework.
-To run `formsvc` with this UI, you must add the -ui flag to the command line.
+To run `formsvc` with this UI, you must add the -ui flag to the command line. You must build the svelte app before (`npm install` and `npm build` in the admin folder)
 
 If you want something more efficient for form responses visualization, you could plug something like [NocoDB](https://nocodb.com/) to the database (if you backend is PostgreSQL)
 

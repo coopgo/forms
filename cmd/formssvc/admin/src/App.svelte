@@ -47,7 +47,8 @@
 
 <main>
 	<div id="leftpanel">
-		<h1><img src="https://coopgo.fr/images/coopgo-logo-bluegreen.svg" alt="COOPGO" /> Forms Service</h1>
+		<!-- <h1><img src="https://coopgo.fr/images/coopgo-logo-whitegreen.svg" alt="COOPGO" /> Forms Service</h1> -->
+		<h1>COOPGO Forms Service</h1>
 		<ul id="mainmenu">
 			<li><a href="#/create">+ Create a new form</a></li>
 		</ul>
