@@ -58,7 +58,7 @@ func (b PgsqlBackend) AddForm(f Form) error {
 		return errors.New("a form already exists with this id")
 	}
 
-	sql := fmt.Sprintf("create table form_%s (", f.ID()) +
+	sql := fmt.Sprintf("create table form_%s (", pgx.Identifier{f.ID()}.Sanitize()) +
 		schemaToSQL(f.GetSchema()) +
 		")"
 
@@ -237,9 +237,6 @@ func (b PgsqlBackend) SubmitResponse(form Form, response Response) error {
 					return err
 				}
 				break
-
-				// TODO other types !!!
-				// TODO recursive
 			}
 		}
 		if _, err := tx.CopyFrom(
@@ -292,9 +289,6 @@ func (b PgsqlBackend) GetFormResponses(formId string) ([]Response, error) {
 
 // AddFormBackend adds an additional backend to a given form
 func (b PgsqlBackend) AddFormBackend(id string, backend Backend) error {
-	// var formid string
-	// var formtype string
-	// var formschema []byte
 	var formbackends []byte
 	if err := b.Conn.QueryRow(context.Background(), "select additional_backends from __config where id=$1", id).Scan(&formbackends); err != nil {
 		fmt.Println("1 : ", err)
@@ -344,6 +338,8 @@ func (b PgsqlBackend) GetFormBackends(id string) ([]Backend, error) {
 
 // schemaToSQL is a small function to generate table columns name and types from a JTD schema (used during table creation)
 // Returns "" (empty string) in case of a nil schema
+//
+// TODO Refactor this function to make it recursive and support more complex schemas + don't repeat yourself !
 func schemaToSQL(s *jtd.Schema) string {
 	if s == nil {
 		return ""
@@ -357,7 +353,7 @@ func schemaToSQL(s *jtd.Schema) string {
 		first = false
 		switch {
 		case v.Type == "string":
-			create += fmt.Sprintf("%s varchar(250)", pgx.Identifier{k}.Sanitize())
+			create += fmt.Sprintf("%s varchar", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "boolean":
 			create += fmt.Sprintf("%s boolean", pgx.Identifier{k}.Sanitize())
@@ -368,6 +364,35 @@ func schemaToSQL(s *jtd.Schema) string {
 		case v.Type == "int8" || v.Type == "uint8" || v.Type == "int16" || v.Type == "uint16" || v.Type == "int32" || v.Type == "uint32":
 			create += fmt.Sprintf("%s integer", pgx.Identifier{k}.Sanitize())
 			break
+		case v.Type == "timestamp":
+			create += fmt.Sprintf("%s timestamp", pgx.Identifier{k}.Sanitize())
+			break
+		case v.Enum != nil && len(v.Enum) > 0:
+			create += fmt.Sprintf("%s varchar", pgx.Identifier{k}.Sanitize())
+			break
+		case v.Elements != nil:
+			//It is an array !
+			switch {
+			case v.Elements.Type == "string":
+				create += fmt.Sprintf("%s varchar[] ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Elements.Type == "boolean":
+				create += fmt.Sprintf("%s boolean ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Elements.Type == "float64" || v.Type == "float32":
+				create += fmt.Sprintf("%s numeric[] ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Elements.Type == "int8" || v.Type == "uint8" || v.Type == "int16" || v.Type == "uint16" || v.Type == "int32" || v.Type == "uint32":
+				create += fmt.Sprintf("%s integer[] ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Elements.Type == "timestamp":
+				create += fmt.Sprintf("%s timestamp[]", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Elements.Enum != nil && len(v.Enum) > 0:
+				create += fmt.Sprintf("%s varchar[]", pgx.Identifier{k}.Sanitize())
+				break
+			}
+			break
 		}
 	}
 	for k, v := range s.OptionalProperties {
@@ -377,16 +402,45 @@ func schemaToSQL(s *jtd.Schema) string {
 		first = false
 		switch {
 		case v.Type == "string":
-			create += fmt.Sprintf("%s varchar(250) ", k)
+			create += fmt.Sprintf("%s varchar(250) ", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "boolean":
-			create += fmt.Sprintf("%s boolean ", k)
+			create += fmt.Sprintf("%s boolean ", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "float64" || v.Type == "float32":
-			create += fmt.Sprintf("%s numeric ", k)
+			create += fmt.Sprintf("%s numeric ", pgx.Identifier{k}.Sanitize())
 			break
 		case v.Type == "int8" || v.Type == "uint8" || v.Type == "int16" || v.Type == "uint16" || v.Type == "int32" || v.Type == "uint32":
-			create += fmt.Sprintf("%s integer ", k)
+			create += fmt.Sprintf("%s integer ", pgx.Identifier{k}.Sanitize())
+			break
+		case v.Type == "timestamp":
+			create += fmt.Sprintf("%s timestamp", pgx.Identifier{k}.Sanitize())
+			break
+		case v.Enum != nil && len(v.Enum) > 0:
+			create += fmt.Sprintf("%s string", pgx.Identifier{k}.Sanitize())
+			break
+		case v.Elements != nil:
+			//It is an array !
+			switch {
+			case v.Type == "string":
+				create += fmt.Sprintf("%s varchar(250)[] ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Type == "boolean":
+				create += fmt.Sprintf("%s boolean ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Type == "float64" || v.Type == "float32":
+				create += fmt.Sprintf("%s numeric[] ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Type == "int8" || v.Type == "uint8" || v.Type == "int16" || v.Type == "uint16" || v.Type == "int32" || v.Type == "uint32":
+				create += fmt.Sprintf("%s integer[] ", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Type == "timestamp":
+				create += fmt.Sprintf("%s timestamp[]", pgx.Identifier{k}.Sanitize())
+				break
+			case v.Enum != nil && len(v.Enum) > 0:
+				create += fmt.Sprintf("%s string[]", pgx.Identifier{k}.Sanitize())
+				break
+			}
 			break
 		}
 	}
